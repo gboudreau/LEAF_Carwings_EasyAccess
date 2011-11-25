@@ -1,0 +1,81 @@
+<?php
+require_once("functions.inc.php");
+
+$needs_footer = FALSE;
+if (!$has_header) {
+	_header('Status');
+	$needs_footer = TRUE;
+}
+
+if (empty($using_query)) {
+	$result = execute_command(CAR_UPDATE);
+	if ($result !== 'true') {
+		die("Status Update failed: $result\n");
+	}
+	$using_query = CAR_UPDATE_QUERY;
+}
+
+$result = execute_command($using_query);
+$json = json_decode($result);
+if ($json === FALSE) {
+	die("Query result failed to parse as JSON: $result\n");
+} else if (@$using_query == FAN_QUERY) {
+	?>
+	<h2>LEAF status</h2>
+	Climate control:
+		<?php echo ($json->currentHvac ? '<span class="on">ON</span>' : '<span class="off">OFF</span>') ?><br/>
+	<hr/>
+	<?php
+} else if (@$using_query == START_CHARGE_QUERY) {
+	?>
+	<h2>LEAF status</h2>
+	Plugged in: 
+		<?php echo ($json->currentPluggedIn == 1 ? '<span class="on">YES</span>' : '<span class="off">NO</span>') ?><br/>
+	Charging: 
+		<?php echo ($json->currentCharging == 'NOT_CHARGING' ? '<span class="off">NO</span>' : '<span class="on">YES</span>') ?><br/>
+	Charge Time:
+		<?php echo $json->chargeTime ?><br/>
+		<?php if ($json->chargeTime220): ?>
+			<span class="charge_220">(<?php echo $json->chargeTime220 ?> on 220v)</span><br/>
+		<?php endif; ?>
+	<hr/>
+	<?php
+} else {
+	?>
+	<h2>LEAF status</h2>
+	
+	Battery: 
+		<?php echo "$json->currentBattery/12 (" . number_format($json->currentBattery/12*100, 0) . "%)" ?><br/>
+	<hr/>
+
+	Plugged in: 
+		<?php echo ($json->currentPluggedIn == 1 ? '<span class="on">YES</span>' : '<span class="off">NO</span>') ?><br/>
+	Charging: 
+		<?php echo ($json->currentCharging == 'NOT_CHARGING' ? '<span class="off">NO</span>' : '<span class="on">YES</span>') ?><br/>
+	Charge Time:
+		<?php echo $json->chargeTime ?><br/>
+		<?php if (TRUE || $json->chargeTime220): ?>
+			<span class="charge_220">(<?php echo $json->chargeTime220 ?> on 220v)</span><br/>
+		<?php endif; ?>
+	<hr/>
+	
+	Climate control:
+		<?php echo ($json->currentHvac ? '<span class="on">ON</span>' : '<span class="off">OFF</span>') ?><br/>
+	<hr/>
+
+	Range: 
+		<?php echo number_format($json->rangeHvacOff/1000, 0) ?>km<br/>
+		<span class="range_wclimate">(<?php echo number_format($json->rangeHvacOn/1000, 0) ?>km w/climate control)<br/>
+	<hr/>
+
+	<?php
+	/*
+	echo "<pre>";
+	var_dump($json);
+	echo "</pre>";
+	*/
+}
+
+if ($needs_footer) {
+	footer();
+}

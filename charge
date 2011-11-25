@@ -1,0 +1,14 @@
+<?php
+require_once("functions.inc.php");
+
+_header('Start Charge');
+
+$result = execute_command(START_CHARGE);
+if ($result !== 'true') {
+	die("Charge Start failed: $result\n");
+}
+
+$using_query = START_CHARGE_QUERY;
+include("status");
+
+footer();

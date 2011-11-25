@@ -1,0 +1,9 @@
+<FilesMatch ".*">
+  AddDefaultCharset UTF-8
+  ForceType application/x-httpd-php
+</FilesMatch>
+
+<FilesMatch ".*\.png">
+  ForceType image/png
+</FilesMatch>
+

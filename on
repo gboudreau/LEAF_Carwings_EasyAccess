@@ -1,0 +1,14 @@
+<?php
+require_once("functions.inc.php");
+
+_header('Climate ON');
+
+$result = execute_command(FAN_ON);
+if ($result !== 'true') {
+	die("Fan ON failed: $result\n");
+}
+
+$using_query = FAN_QUERY;
+include("status");
+
+footer();
