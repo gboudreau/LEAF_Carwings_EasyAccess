@@ -17,7 +17,7 @@ $password = $car->password;
 $portals = array(
 	'CA' => 'https://carwings.mynissan.ca',
 	'US' => 'https://www.nissanusa.com/owners',
-)
+);
 $portal_url = $portals[strtoupper($car->country)];
 
 define('FAN_ON', 'setHvac?fan=on');
