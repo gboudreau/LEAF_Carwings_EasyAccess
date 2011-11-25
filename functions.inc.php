@@ -18,6 +18,7 @@ $portals = array(
 	'CA' => 'https://carwings.mynissan.ca',
 	'US' => 'https://www.nissanusa.com/owners',
 );
+
 $portal_url = $portals[strtoupper($car->country)];
 
 define('FAN_ON', 'setHvac?fan=on');
@@ -53,7 +54,7 @@ function getCookieFile() {
 }
 
 function login() {
-	global $username, $password, $car_id, $needs_login, $portal_url;
+	global $username, $password, $car_id, $needs_login, $portal_url, $id;
 	
 	if ($needs_login) {
 		$url = $portal_url . '/j_spring_security_check';
@@ -62,12 +63,12 @@ function login() {
 	}
 
 	// Get car_id
-	$car_id = (int) file_get_contents(".car_id-" . $id);
+	$car_id = (int) file_get_contents("/tmp/.car_id-" . $id);
 	if (empty($car_id)) {
 		$result = curl_query($portal_url . '/vehicles');
 		if (preg_match('@<div class="vehicleHeader" id="([0-9]*)">@', $result, $regs)) {
 			$car_id = $regs[1];
-			file_put_contents(".car_id-" . $id, $car_id);
+			file_put_contents("/tmp/.car_id-" . $id, $car_id);
 		} else {
 			die("Can't find car_id in result:\n$result\n");
 		}
@@ -89,7 +90,6 @@ function curl_query($url, $post_data=null) {
 	global $referer;
 	$ch = curl_init($url);
 	curl_setopt($ch, CURLOPT_ENCODING , "gzip,deflate");
-	//curl_setopt($ch, CURLOPT_FOLLOWLOCATION, TRUE);
 	curl_setopt($ch, CURLOPT_HEADER, FALSE);
 	curl_setopt($ch, CURLOPT_COOKIEJAR, getCookieFile());
 	curl_setopt($ch, CURLOPT_COOKIEFILE, getCookieFile());
@@ -144,8 +144,8 @@ function _header($title) {
 		<link rel="icon" sizes="57x57" type="image/png" href="/apple-touch-icon-57x57.png"/>
 		<link rel="icon" sizes="72x72" type="image/png" href="/apple-touch-icon-72x72.png"/>
 		<link rel="icon" sizes="114x114" type="image/png" href="/apple-touch-icon-114x114.png"/>
-		<style type="text/css">body{font-family:Georgia,Helvetica,Arial}.on{color:green}.off{color:red}.charge_220{padding-left:90px}.range_wclimate{padding-left:50px}</style>
-		<style type="text/css" media="only screen and (max-device-width: 480px)">body{font-size:4em}</style>
+		<style type="text/css">body{font-family:Georgia,Helvetica,Arial}.on{color:green}.off{color:red}.charge_220{padding-left:96px}.range_wclimate{padding-left:52px}</style>
+		<style type="text/css" media="only screen and (max-device-width: 480px)">body{font-size:4em}.charge_220{position:absolute;right:0}.range_wclimate{padding-left:204px}</style>
 	</head>
 	<body>
 	<?php
