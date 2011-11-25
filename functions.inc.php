@@ -75,7 +75,7 @@ function login() {
 }
 
 function execute_command($cmd, $logged_id=FALSE) {
-	global $car_id;
+	global $car_id, $portal_url;
 	if (strpos($cmd, '?') !== FALSE) {
 		$cmd .= '&';
 	} else {
