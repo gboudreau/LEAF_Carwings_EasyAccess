@@ -21,4 +21,4 @@ Edit config.inc.php:
 
 You're done.
 
-You can now access the one-click shortcuts using the index page at http://www.your_domain.com/leaf/?id=\_your\_guid\_here\_
+You can now access the one-click shortcuts using the index page at http://www.your_domain.com/leaf/?id=_your_guid_here_
