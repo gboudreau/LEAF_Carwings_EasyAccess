@@ -54,10 +54,14 @@ function getCookieFile() {
 }
 
 function login() {
-	global $username, $password, $car_id, $needs_login, $portal_url, $id;
+	global $username, $password, $car_id, $needs_login, $portal_url, $id, $car;
 	
 	if ($needs_login) {
-		$url = $portal_url . '/j_spring_security_check';
+		if (strtoupper($car->country) == 'US') {
+			$url = $portal_url . '/owners/j_spring_security_check';
+		} else {
+			$url = $portal_url . '/j_spring_security_check';
+		}
 		$post_data = 'j_username=' . urlencode($username) . '&j_passwordHolder=Password&j_password=' . urlencode($password) . '&owners_remember_me=on';
 		curl_query($url, $post_data);
 	}
@@ -91,6 +95,7 @@ function curl_query($url, $post_data=null) {
 	$ch = curl_init($url);
 	curl_setopt($ch, CURLOPT_ENCODING , "gzip,deflate");
 	curl_setopt($ch, CURLOPT_HEADER, FALSE);
+	curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, FALSE);
 	curl_setopt($ch, CURLOPT_COOKIEJAR, getCookieFile());
 	curl_setopt($ch, CURLOPT_COOKIEFILE, getCookieFile());
 
