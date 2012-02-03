@@ -64,8 +64,8 @@ if ($json === FALSE) {
 	<hr/>
 
 	Range: 
-		<?php echo number_format($json->rangeHvacOff/1000, 0) ?>km<br/>
-		<span class="range_wclimate">(<?php echo number_format($json->rangeHvacOn/1000, 0) ?>km w/climate control)<br/>
+		<?php echo number_format($json->rangeHvacOff/1000, 0) . (strtoupper($car->country) == 'US' ? ' miles' : ' km') ?><br/>
+		<span class="range_wclimate">(<?php echo number_format($json->rangeHvacOn/1000, 0) . (strtoupper($car->country) == 'US' ? ' miles' : ' km') ?> w/climate control)<br/>
 	<hr/>
 
 	<?php
