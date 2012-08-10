@@ -3,7 +3,7 @@ require_once("functions.inc.php");
 
 $needs_footer = FALSE;
 if (!$has_header) {
-	_header('Status');
+	_header('LEAF Status');
 	$needs_footer = TRUE;
 }
 
@@ -19,30 +19,8 @@ $result = execute_command($using_query);
 $json = json_decode($result);
 if ($json === FALSE) {
 	die("Query result failed to parse as JSON: $result\n");
-} else if (@$using_query == FAN_QUERY) {
-	?>
-	<h2>LEAF status</h2>
-	Climate control:
-		<?php echo ($json->currentHvac ? '<span class="on">ON</span>' : '<span class="off">OFF</span>') ?><br/>
-	<hr/>
-	<?php
-} else if (@$using_query == START_CHARGE_QUERY) {
-	?>
-	<h2>LEAF status</h2>
-	Plugged in: 
-		<?php echo ($json->currentPluggedIn == 1 ? '<span class="on">YES</span>' : '<span class="off">NO</span>') ?><br/>
-	Charging: 
-		<?php echo ($json->currentCharging == 'NOT_CHARGING' ? '<span class="off">NO</span>' : '<span class="on">YES</span>') ?><br/>
-	Charge Time:
-		<?php echo $json->chargeTime ?><br/>
-		<?php if ($json->chargeTime220): ?>
-			<span class="charge_220">(<?php echo $json->chargeTime220 ?> on 220v)</span><br/>
-		<?php endif; ?>
-	<hr/>
-	<?php
 } else {
 	?>
-	<h2>LEAF status</h2>
 	
 	Battery: 
 		<?php echo "$json->currentBattery/12 (" . number_format($json->currentBattery/12*100, 0) . "%)" ?><br/>
@@ -53,9 +31,9 @@ if ($json === FALSE) {
 	Charging: 
 		<?php echo ($json->currentCharging == 'NOT_CHARGING' ? '<span class="off">NO</span>' : '<span class="on">YES</span>') ?><br/>
 	Charge Time:
-		<?php echo $json->chargeTime ?><br/>
+		<?php echo $json->chargeTime ?> (trickle)<br/>
 		<?php if (TRUE || $json->chargeTime220): ?>
-			<span class="charge_220">(<?php echo $json->chargeTime220 ?> on 220v)</span><br/>
+			<span class="charge_220">(<?php echo $json->chargeTime220 ?> w/fast charge)</span><br/>
 		<?php endif; ?>
 	<hr/>
 	
@@ -76,8 +54,13 @@ if ($json === FALSE) {
 		}
 		?>
 		<?php echo $range['HvacOff'] . ' ' . $units ?><br/>
-		<span class="range_wclimate">(<?php echo $range['HvacOn'] . ' ' . $units ?> w/climate control)<br/>
+		<span class="range_wclimate">(-<?php echo ($range['HvacOff']-$range['HvacOn']) . ' ' . $units ?> w/climate control)<br/>
 	<hr/>
+
+    <br/>
+    <?php if (!isset($_GET['book'])): ?>
+        <a href="#" onclick="window.location.href='/status?book=y&amp;id=<?php echo $_GET['id'] ?>';return false;">Bookmark this page</a>
+    <?php endif; ?>
 
 	<?php
 	/*
@@ -90,3 +73,4 @@ if ($json === FALSE) {
 if ($needs_footer) {
 	footer();
 }
+

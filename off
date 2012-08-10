@@ -8,7 +8,15 @@ if ($result !== 'true') {
 	die("Fan OFF failed: $result\n");
 }
 
-$using_query = FAN_QUERY;
-include("status");
+#$using_query = FAN_QUERY;
+#include("status");
+?>
 
-footer();
+<b>Climate control <span class="off">OFF</span></b> command<br/>
+has been successfully sent to your LEAF.<br/>
+<br/>
+<?php if (!isset($_GET['book'])): ?>
+    <a href="#" onclick="window.location.href='/off?book=y&amp;id=<?php echo $_GET['id'] ?>';return false;">Bookmark this page</a>
+<?php endif; ?>
+
+<?php footer() ?>

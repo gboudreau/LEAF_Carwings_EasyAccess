@@ -149,17 +149,30 @@ function _header($title) {
 		<link rel="icon" sizes="57x57" type="image/png" href="/apple-touch-icon-57x57.png"/>
 		<link rel="icon" sizes="72x72" type="image/png" href="/apple-touch-icon-72x72.png"/>
 		<link rel="icon" sizes="114x114" type="image/png" href="/apple-touch-icon-114x114.png"/>
-		<style type="text/css">body{font-family:Georgia,Helvetica,Arial}.on{color:green}.off{color:red}.charge_220{padding-left:96px}.range_wclimate{padding-left:52px}</style>
-		<style type="text/css" media="only screen and (max-device-width: 480px)">body{font-size:4em}.charge_220{position:absolute;right:0}.range_wclimate{padding-left:204px}</style>
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<link rel="stylesheet" href="http://code.jquery.com/mobile/1.1.1/jquery.mobile-1.1.1.min.css" />
+        <script src="http://code.jquery.com/jquery-1.7.2.min.js"></script>
+        <script src="http://code.jquery.com/mobile/1.1.1/jquery.mobile-1.1.1.min.js"></script>
+		<style>
+		    .on{color:green}
+		    .off{color:red}
+            .ui-header .ui-title {
+                margin: 15px;
+            }
+        </style>
 	</head>
-	<body>
+	<div data-role="page">
+	    <div data-role="header"><h1><?php echo htmlentities($title) ?></h1></div>
+	    <div data-role="content">
 	<?php
 }
 
 function footer() {
 	?>
+	</div>
 	</body>
 	</html>
 	<?php
 }
 ?>
+
