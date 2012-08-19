@@ -1,6 +1,5 @@
-<FilesMatch "(charge|off|on|status)">
+<FilesMatch "(charge|off|on|status)\.php">
   AddDefaultCharset UTF-8
-  ForceType application/x-httpd-php
 </FilesMatch>
 
 <FilesMatch ".*\.png">

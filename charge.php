@@ -9,14 +9,14 @@ if ($result !== 'true') {
 }
 
 #$using_query = START_CHARGE_QUERY;
-#include("status");
+#include("status.php");
 ?>
 
 <b>Start Charging</b> command<br/>
 has been successfully sent to your LEAF.<br/>
 <br/>
 <?php if (!isset($_GET['book'])): ?>
-    <a href="#" onclick="window.location.href='/charge?book=y&amp;id=<?php echo $_GET['id'] ?>';return false;">Bookmark this page</a>
+    <a href="#" onclick="window.location.href='/charge.php?book=y&amp;id=<?php echo $_GET['id'] ?>';return false;">Bookmark this page</a>
 <?php endif; ?>
 
 <?php footer() ?>

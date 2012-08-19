@@ -59,7 +59,7 @@ if ($json === FALSE) {
 
     <br/>
     <?php if (!isset($_GET['book'])): ?>
-        <a href="#" onclick="window.location.href='/status?book=y&amp;id=<?php echo $_GET['id'] ?>';return false;">Bookmark this page</a>
+        <a href="#" onclick="window.location.href='/status.php?book=y&amp;id=<?php echo $_GET['id'] ?>';return false;">Bookmark this page</a>
     <?php endif; ?>
 
 	<?php
