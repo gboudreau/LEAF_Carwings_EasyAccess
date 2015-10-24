@@ -19,7 +19,7 @@ $result = execute_command(CAR_UPDATE_QUERY);
 //$json = json_decode($result);
 
 $doc = new DOMDocument();
-$doc->loadHTML($result);
+@$doc->loadHTML($result);
 
 $json = array();
 $tags = $doc->getElementsByTagName('input');
