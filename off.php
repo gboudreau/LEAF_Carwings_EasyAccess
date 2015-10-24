@@ -7,9 +7,6 @@ $result = execute_command(FAN_OFF);
 if ($result !== 'true') {
 	die("Fan OFF failed: $result\n");
 }
-
-#$using_query = FAN_QUERY;
-#include("status");
 ?>
 
 <b>Climate control <span class="off">OFF</span></b> command<br/>

@@ -15,7 +15,7 @@ $username = $car->username;
 $password = $car->password;
 
 $portals = array(
-	'CA' => 'https://carwings.mynissan.ca',
+	'CA' => 'https://carwings.mynissan.ca/owners',
 	'US' => 'https://www.nissanusa.com/owners',
 );
 
@@ -23,11 +23,9 @@ $portal_url = $portals[strtoupper($car->country)];
 
 define('FAN_ON', 'setHvac?fan=on');
 define('FAN_OFF', 'setHvac?fan=off');
-define('FAN_QUERY', 'pollHvac');
 define('CAR_UPDATE', 'statusRefresh');
-define('CAR_UPDATE_QUERY', 'pollStatusRefresh');
+define('CAR_UPDATE_QUERY', 'checkev?tsp=leaf');
 define('START_CHARGE', 'startCharge');
-define('START_CHARGE_QUERY', 'pollStartCharge');
 
 if (!@$skip_login) {
 	// Keep cookies for 29 minutes
@@ -41,7 +39,7 @@ if (!@$skip_login) {
 
 	$referer = $portal_url . '/login';
 	login();
-	if (empty($car_id)) {
+	if (empty($car_vin)) {
 		die("Login failed, or failed to find car_id in resulting page.\n");
 	}
 }
@@ -54,40 +52,36 @@ function getCookieFile() {
 }
 
 function login() {
-	global $username, $password, $car_id, $needs_login, $portal_url, $id, $car;
+	global $username, $password, $car_vin, $needs_login, $portal_url, $id;
 	
 	if ($needs_login) {
-		if (strtoupper($car->country) == 'US') {
-			$url = $portal_url . '/owners/j_spring_security_check';
-		} else {
-			$url = $portal_url . '/j_spring_security_check';
-		}
-		$post_data = 'j_username=' . urlencode($username) . '&j_passwordHolder=Password&j_password=' . urlencode($password) . '&owners_remember_me=on';
+		$url = $portal_url . '/j_spring_security_check';
+		$post_data = 'j_username=' . urlencode($username) . '&j_password=' . urlencode($password) . '&ReturnUrl=';
 		curl_query($url, $post_data);
 	}
 
 	// Get car_id
-	$car_id = (int) file_get_contents("/tmp/.car_id-" . $id);
-	if (empty($car_id)) {
+	$car_vin = file_get_contents("/tmp/.car_vin-" . $id);
+	if (empty($car_vin)) {
 		$result = curl_query($portal_url . '/vehicles');
-		if (preg_match('@<div class="vehicleHeader" id="([0-9]*)">@', $result, $regs)) {
-			$car_id = $regs[1];
-			file_put_contents("/tmp/.car_id-" . $id, $car_id);
+		if (preg_match('@<span class="vin">VIN:\s*([A-Z0-9]+)</span>@', $result, $regs)) {
+			$car_vin = $regs[1];
+			file_put_contents("/tmp/.car_vin-" . $id, $car_vin);
 		} else {
 			die("Can't find car_id in result:\n$result\n");
 		}
 	}
 }
 
-function execute_command($cmd, $logged_id=FALSE) {
-	global $car_id, $portal_url;
+function execute_command($cmd, $post_data=null) {
+	global $car_vin, $portal_url;
 	if (strpos($cmd, '?') !== FALSE) {
 		$cmd .= '&';
 	} else {
 		$cmd .= '?';
 	}
-	$url = $portal_url . '/vehicles/' . $cmd . 'id=' . $car_id . '&rand=' . rand(0, 2) . mt_rand();
-	return curl_query($url);
+	$url = $portal_url . '/leaf/' . $cmd . 'vin=' . $car_vin;
+	return curl_query($url, $post_data);
 }
 
 function curl_query($url, $post_data=null) {
@@ -104,19 +98,16 @@ function curl_query($url, $post_data=null) {
 	$host = substr($url, strpos($url, '/')+2);
 	$host = substr($host, 0, strpos($host, '/'));
 	$custom_headers[] = "Host: $host";
-	$custom_headers[] = "User-Agent: Mozilla/5.0 (Macintosh; U; PPC Mac OS X Mach-O; en-US; rv:1.8.1.4) Gecko/20070531 Firefox/2.0.0.4";
-	$custom_headers[] = "Accept: image/png,*/*;q=0.5";
-	$custom_headers[] = "Accept-Language: en-ca,en-us;q=0.8,en;q=0.6,fr-ca;q=0.4,fr;q=0.2";
-	$custom_headers[] = "Accept-Charset: UTF-8,*";
-	$custom_headers[] = "Keep-Alive: 300";
-	$custom_headers[] = "Connection: keep-alive";
+	$custom_headers[] = "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.16 Safari/537.36";
+	$custom_headers[] = "Accept: */*";
+	$custom_headers[] = "Accept-Language: en-US,en;q=0.8,fr;q=0.6";
 	if ($referer != null) {
 		$custom_headers[] = "Referer: $referer";
 	}
 	$custom_headers[] = "Cache-Control: max-age=0";
 	curl_setopt($ch, CURLOPT_HTTPHEADER, $custom_headers);
 
-	if (!empty($post_data)) {
+	if ($post_data !== null) {
 		curl_setopt($ch, CURLOPT_POST, true);
 		curl_setopt($ch, CURLOPT_POSTFIELDS, $post_data);
 	}
@@ -174,5 +165,4 @@ function footer() {
 	</html>
 	<?php
 }
-?>
 

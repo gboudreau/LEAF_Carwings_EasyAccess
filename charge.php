@@ -7,9 +7,6 @@ $result = execute_command(START_CHARGE);
 if ($result !== 'true') {
 	die("Charge Start failed: $result\n");
 }
-
-#$using_query = START_CHARGE_QUERY;
-#include("status.php");
 ?>
 
 <b>Start Charging</b> command<br/>
