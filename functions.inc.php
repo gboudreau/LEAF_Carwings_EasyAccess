@@ -29,9 +29,9 @@ define('START_CHARGE', 'startCharge');
 
 if (!@$skip_login) {
 	// Keep cookies for 29 minutes
-	$s = stat(getCookieFile());
+	$s = @stat(getCookieFile());
 	if ($s['mtime'] < time()-(29*60)) {
-		unlink(getCookieFile());
+		@unlink(getCookieFile());
 		$needs_login = TRUE;
 	} else {
 		$needs_login = FALSE;
@@ -61,7 +61,7 @@ function login() {
 	}
 
 	// Get car_id
-	$car_vin = file_get_contents("/tmp/.car_vin-" . $id);
+	$car_vin = @file_get_contents("/tmp/.car_vin-" . $id);
 	if (empty($car_vin)) {
 		$result = curl_query($portal_url . '/vehicles');
 		if (preg_match('@<span class="vin">VIN:\s*([A-Z0-9]+)</span>@', $result, $regs)) {
