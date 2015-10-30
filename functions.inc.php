@@ -16,15 +16,20 @@ $password = $car->password;
 
 $portals = array(
 	'CA' => 'https://carwings.mynissan.ca/owners',
-	'US' => 'https://www.nissanusa.com/owners',
+	'US' => 'https://www.nissanusa.com/nowners',
 );
 
-$portal_url = $portals[strtoupper($car->country)];
+$car->country = strtoupper($car->country);
+$portal_url = $portals[$car->country];
 
 define('FAN_ON', 'setHvac?fan=on');
 define('FAN_OFF', 'setHvac?fan=off');
 define('CAR_UPDATE', 'statusRefresh');
-define('CAR_UPDATE_QUERY', 'checkev?tsp=leaf');
+if ($car->country == 'US') {
+    define('CAR_UPDATE_QUERY', 'refresh');
+} else {
+    define('CAR_UPDATE_QUERY', 'checkev?tsp=leaf');
+}
 define('START_CHARGE', 'startCharge');
 
 if (!@$skip_login) {
@@ -52,35 +57,56 @@ function getCookieFile() {
 }
 
 function login() {
-	global $username, $password, $car_vin, $needs_login, $portal_url, $id;
+	global $username, $password, $car_vin, $needs_login, $portal_url, $id, $car;
 	
 	if ($needs_login) {
-		$url = $portal_url . '/j_spring_security_check';
-		$post_data = 'j_username=' . urlencode($username) . '&j_password=' . urlencode($password) . '&ReturnUrl=';
+		if ($car->country == 'US') {
+			$url = $portal_url . '/user/login';
+			$post_data = 'callFrom=&status=&status=&username=' . urlencode($username) . '&password=' . urlencode($password) . '&_rememberMeCheckbox=';
+		} else {
+			$url = $portal_url . '/j_spring_security_check';
+			$post_data = 'j_username=' . urlencode($username) . '&j_password=' . urlencode($password) . '&ReturnUrl=';
+		}
 		curl_query($url, $post_data);
 	}
 
 	// Get car_id
 	$car_vin = @file_get_contents("/tmp/.car_vin-" . $id);
 	if (empty($car_vin)) {
-		$result = curl_query($portal_url . '/vehicles');
-		if (preg_match('@<span class="vin">VIN:\s*([A-Z0-9]+)</span>@', $result, $regs)) {
-			$car_vin = $regs[1];
-			file_put_contents("/tmp/.car_vin-" . $id, $car_vin);
+		if ($car->country == 'US') {
+			// US
+			$result = curl_query($portal_url . '/vehicle/viewVehicle');
+			if (preg_match('@<input type="hidden" name="vin" value="([A-Z0-9]+)"@', $result, $regs)) {
+				$car_vin = $regs[1];
+				file_put_contents("/tmp/.car_vin-" . $id, $car_vin);
+			} else {
+				die("Can't find car_id in result:\n$result\n");
+			}
 		} else {
-			die("Can't find car_id in result:\n$result\n");
+			// Canada
+			$result = curl_query($portal_url . '/vehicles');
+			if (preg_match('@<span class="vin">VIN:\s*([A-Z0-9]+)</span>@', $result, $regs)) {
+				$car_vin = $regs[1];
+				file_put_contents("/tmp/.car_vin-" . $id, $car_vin);
+			} else {
+				die("Can't find car_id in result:\n$result\n");
+			}
 		}
 	}
 }
 
 function execute_command($cmd, $post_data=null) {
-	global $car_vin, $portal_url;
+	global $car_vin, $portal_url, $car;
 	if (strpos($cmd, '?') !== FALSE) {
 		$cmd .= '&';
 	} else {
 		$cmd .= '?';
 	}
-	$url = $portal_url . '/leaf/' . $cmd . 'vin=' . $car_vin;
+	if ($car->country == 'US') {
+    	$url = $portal_url . '/EV/' . $cmd . 'vin=' . $car_vin . "&_=" . time();
+    } else {
+        $url = $portal_url . '/leaf/' . $cmd . 'vin=' . $car_vin;
+    }
 	return curl_query($url, $post_data);
 }
 
@@ -92,6 +118,7 @@ function curl_query($url, $post_data=null) {
 	curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, FALSE);
 	curl_setopt($ch, CURLOPT_COOKIEJAR, getCookieFile());
 	curl_setopt($ch, CURLOPT_COOKIEFILE, getCookieFile());
+	curl_setopt($ch, CURLOPT_FOLLOWLOCATION, TRUE);
 
 	// Fake headers
 	$custom_headers = array();
@@ -129,26 +156,29 @@ function _header($title) {
 	?><html>
 	<head>
 		<title><?php echo htmlentities($title) ?></title>
-		<link rel="icon" sizes="48x48" type="image/png" href="/favicon.png"/>
+		<link rel="icon" sizes="48x48" type="image/png" href="./favicon.png"/>
 		<!--[if IE]>
-		<link rel="shortcut icon" href="/favicon.ico"/>
+		<link rel="shortcut icon" href="./favicon.ico"/>
 		<![endif]-->
-		<link rel="apple-touch-icon-precomposed" href="/apple-touch-icon.png"/>
-		<link rel="apple-touch-icon-precomposed" sizes="57x57" href="/apple-touch-icon-57x57.png"/>
-		<link rel="apple-touch-icon-precomposed" sizes="72x72" href="/apple-touch-icon-72x72.png"/>
-		<link rel="apple-touch-icon-precomposed" sizes="114x114" href="/apple-touch-icon-114x114.png"/>
-		<link rel="icon" sizes="57x57" type="image/png" href="/apple-touch-icon-57x57.png"/>
-		<link rel="icon" sizes="72x72" type="image/png" href="/apple-touch-icon-72x72.png"/>
-		<link rel="icon" sizes="114x114" type="image/png" href="/apple-touch-icon-114x114.png"/>
+		<link rel="apple-touch-icon-precomposed" href="./apple-touch-icon.png"/>
+		<link rel="apple-touch-icon-precomposed" sizes="57x57" href="./apple-touch-icon-57x57.png"/>
+		<link rel="apple-touch-icon-precomposed" sizes="72x72" href="./apple-touch-icon-72x72.png"/>
+		<link rel="apple-touch-icon-precomposed" sizes="114x114" href="./apple-touch-icon-114x114.png"/>
+		<link rel="icon" sizes="57x57" type="image/png" href="./apple-touch-icon-57x57.png"/>
+		<link rel="icon" sizes="72x72" type="image/png" href="./apple-touch-icon-72x72.png"/>
+		<link rel="icon" sizes="114x114" type="image/png" href="./apple-touch-icon-114x114.png"/>
 		<meta name="viewport" content="width=device-width, initial-scale=1">
-		<link rel="stylesheet" href="http://code.jquery.com/mobile/1.1.1/jquery.mobile-1.1.1.min.css" />
-        <script src="http://code.jquery.com/jquery-1.7.2.min.js"></script>
-        <script src="http://code.jquery.com/mobile/1.1.1/jquery.mobile-1.1.1.min.js"></script>
+		<link rel="stylesheet" href="//code.jquery.com/mobile/1.1.1/jquery.mobile-1.1.1.min.css" />
+        <script src="//code.jquery.com/jquery-1.7.2.min.js"></script>
+        <script src="//code.jquery.com/mobile/1.1.1/jquery.mobile-1.1.1.min.js"></script>
 		<style>
 		    .on{color:green}
 		    .off{color:red}
             .ui-header .ui-title {
                 margin: 15px;
+            }
+            .charge_trickle, .charge_220, .charge_220_66 {
+                margin-left: 15px;
             }
         </style>
 	</head>

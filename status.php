@@ -80,24 +80,42 @@ $json = (object) $json;
 }
 */
 
+if (empty($json->chrgTm)) {
+    $tags = $doc->getElementsByTagName('td');
+    $is_next = FALSE;
+    foreach ($tags as $tag) {
+        $class = (string) $tag->getAttribute('class');
+        if ($class == 'chrgType' && trim((string) $tag->nodeValue) == 'Trickle') {
+            $is_next = TRUE;
+        }
+        if ($class == 'chrgTypeText' && $is_next) {
+            $json->chrgTm = (string) $tag->nodeValue;
+            break;
+        }
+    }
+}
+
 if ($json === FALSE) {
 	die("Query result failed to parse as JSON. Result: $result\n");
 } else {
 	?>
 	
 	Battery: 
-		<?php echo "$json->btryLvlNb/12 (" . number_format($json->btryLvlNb/12*100, 0) . "%)" ?><br/>
+		<?php echo "$json->btryLvlNb/12 (" . round($json->btryLvlNb*100.0/12) . "%)" ?><br/>
 	<hr/>
 
 	Plugged in: 
 		<?php echo ($json->chrgrCnctdCd == 1 ? '<span class="on">YES</span>' : '<span class="off">NO</span>') ?><br/>
 	Charging: 
 		<?php echo ($json->chargingStsCd == 'NOT_CHARGING' ? '<span class="off">NO</span>' : '<span class="on">YES</span>') ?><br/>
-	Charge Time:
-		<?php echo $json->chrgTm ?> (trickle)<br/>
-		<?php if ($json->chrgTm220KVTx): ?>
-			<span class="charge_220">(<?php echo $json->chrgTm220KVTx ?> w/fast charge)</span><br/>
-		<?php endif; ?>
+	Charge Time:<br/>
+        <span class="charge_trickle">Trickle: <?php echo $json->chrgTm ?><br/></span>
+        <?php if (!empty($json->chrgTm220KVTx)): ?>
+            <span class="charge_220">Normal 3.6 kW: <?php echo $json->chrgTm220KVTx ?><br/></span>
+        <?php endif; ?>
+        <?php if (!empty($json->rmngChrg220KvChrgrTx)): ?>
+            <span class="charge_220_66">Normal 6.6 kW: <?php echo $json->rmngChrg220KvChrgrTx ?><br/></span>
+        <?php endif; ?>
 	<hr/>
 	
 	Climate control:
@@ -106,14 +124,14 @@ if ($json === FALSE) {
 
 	Range: 
 		<?php
-		if (strtoupper($car->country) == 'US') {
+        if ($car->country == 'US') {
 			$units = 'miles';
-			$range['HvacOff'] = number_format($json->rngHvacOffNb*0.000621371192, 0);
-			$range['HvacOn'] = number_format($json->rngHvacOnNb*0.000621371192, 0);
+			$range['HvacOff'] = round($json->rngHvacOffNb*0.000621371192);
+			$range['HvacOn'] = round($json->rngHvacOnNb*0.000621371192);
 		} else {
 			$units = 'km';
-			$range['HvacOff'] = number_format($json->rngHvacOffNb/1000, 0);
-			$range['HvacOn'] = number_format($json->rngHvacOnNb/1000, 0);
+			$range['HvacOff'] = round($json->rngHvacOffNb/1000);
+			$range['HvacOn'] = round($json->rngHvacOnNb/1000);
 		}
 		?>
 		<?php echo $range['HvacOff'] . ' ' . $units ?><br/>
