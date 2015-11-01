@@ -4,7 +4,7 @@ require_once("functions.inc.php");
 _header('Start Charge');
 
 $result = execute_command(START_CHARGE);
-if ($result !== 'true') {
+if ($result !== 'true' && $result !== 'START') {
 	die("Charge Start failed: $result\n");
 }
 ?>
