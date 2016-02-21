@@ -11,7 +11,7 @@ Installation Instructions
 Copy everything (including the hidden .htaccess file!) into a directory on your web server.
 Let's say it's accessible from http://www.your_domain.com/leaf/
 
-Edit your httpd.conf; make sure the directory on your web server has AllowOverride FileInfo or AllowOverride All, to allow the .htacces file to do it's job.
+Edit your httpd.conf; make sure the directory on your web server has AllowOverride FileInfo or AllowOverride All, to allow the .htaccess file to do it's job.
 
 Edit config.inc.php:
 

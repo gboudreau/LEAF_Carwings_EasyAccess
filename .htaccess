@@ -1,7 +1,3 @@
-<FilesMatch "(charge|off|on|status)\.php">
-  AddDefaultCharset UTF-8
-</FilesMatch>
-
 <FilesMatch ".*\.png">
   ForceType image/png
 </FilesMatch>
