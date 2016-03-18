@@ -26,8 +26,13 @@ class NissanConnect {
     /* Those error code will be used in Exception that can be thrown when errors occur. */
     const ERROR_CODE_MISSING_RESULTKEY = 400;
     const ERROR_CODE_LOGIN_FAILED = 403;
+    const ERROR_CODE_INVALID_RESPONSE = 405;
     const ERROR_CODE_NOT_JSON = 406;
     const ERROR_CODE_TIMEOUT = 408;
+    
+    const STATUS_QUERY_OPTION_NONE   = 0;
+    const STATUS_QUERY_OPTION_ASYNC  = 1;
+    const STATUS_QUERY_OPTION_CACHED = 2;
 
     /** @var int How long should we wait, before throwing an exception, when waiting for the car to execute a command. @see $waitForResult parameter in the various function calls. */
     public $maxWaitTime = 290;
@@ -35,10 +40,13 @@ class NissanConnect {
     /** @var boolean Enable to echo debugging information into the PHP error log. */
     public $debug = FALSE;
 
-    private $baseURL = 'https://gdcportalgw.its-mo.com/orchestration_1111/gdc/';
+    private $baseURL = 'https://gdcportalgw.its-mo.com/gworchest_0307C/gdc/';
 
     private $resultKey = NULL;
     private $config = NULL;
+
+    /** @var boolean Should we retry to login, if the API return us a 404 error. */
+    private $shouldRetry = TRUE;
 
     /**
      * NissanConnect constructor.
@@ -58,6 +66,9 @@ class NissanConnect {
         $this->config->country = strtoupper($country);
         $this->config->vin = $vin;
         $this->config->dcmID = $dcmID;
+        $this->config->initialAppStrings = 'geORNtsZe5I4lRGjG9GZiA'; // Hard-coded in mobile apps?
+        $this->config->basePRM = 'uyI5Dj9g8VCOFDnBRUbr3g'; // Will be overwritten with the response from the InitialApp.php call
+        $this->config->customSessionID = ''; // Empty until login completes
     }
 
     /**
@@ -109,26 +120,28 @@ class NissanConnect {
     /**
      * Get battery & climate control status.
      *
-     * @param bool $cached Should we return the result of the last query, instead of making a new query?
+     * @param int $option Specify one of the STATUS_QUERY_OPTION_* constant.
+     *
      * @return stdClass
      * @throws Exception
      */
-    public function getStatus($cached=FALSE) {
+    public function getStatus($option = 0) {
         $this->prepare();
-        if (!$cached) {
+        if ($option != static::STATUS_QUERY_OPTION_CACHED) {
             $this->sendRequest('BatteryStatusCheckRequest.php');
-            $this->waitUntilSuccess('BatteryStatusCheckResultRequest.php');
+            if ($option != static::STATUS_QUERY_OPTION_ASYNC) {
+                $this->waitUntilSuccess('BatteryStatusCheckResultRequest.php');
+            }
+        }
+        if ($option == static::STATUS_QUERY_OPTION_ASYNC) {
+            return NULL;
         }
 
         $response = $this->sendRequest('BatteryStatusRecordsRequest.php');
-        if ($response->BatteryStatusRecords->OperationResult != "START") {
-            throw new Exception("Invalid 'OperationResult' received in call to 'BatteryStatusRecordsRequest.php': " . $response->BatteryStatusRecords->OperationResult, static::ERROR_CODE_LOGIN_FAILED);
-        }
+        $this->_checkStatusResult($response, 'BatteryStatusRecords');
 
         $response2 = $this->sendRequest('RemoteACRecordsRequest.php');
-        if ($response2->RemoteACRecords->OperationResult != "START") {
-            throw new Exception("Invalid 'OperationResult' received in call to 'RemoteACRecordsRequest.php': " . $response->RemoteACRecords->OperationResult, static::ERROR_CODE_LOGIN_FAILED);
-        }
+        $this->_checkStatusResult($response2, 'RemoteACRecords');
 
         $result = new stdClass();
 
@@ -182,7 +195,7 @@ class NissanConnect {
             $result->CruisingRangeUnit = 'km';
         }
 
-        $result->RemoteACRunning = ($response2->RemoteACRecords->RemoteACOperation == 'START');
+        $result->RemoteACRunning = (($response2->RemoteACRecords->PluginState == 'CONNECTED' || $response2->RemoteACRecords->OperationResult == 'START_BATTERY') && $response2->RemoteACRecords->RemoteACOperation != 'STOP');
         $result->RemoteACLastChanged = date('Y-m-d H:i', strtotime($response2->RemoteACRecords->ACStartStopDateAndTime));
         if (!empty($response2->RemoteACRecords->ACStartStopURL)) {
             $result->ACStartStopURL = $response2->RemoteACRecords->ACStartStopURL;
@@ -194,27 +207,41 @@ class NissanConnect {
 
         return $result;
     }
+    
+    private function _checkStatusResult($response, $what) {
+        $allowed_op_result = array('START', 'START_BATTERY', 'FINISH');
+        if (empty($response->{$what})) {
+            throw new Exception("Missing '$what' in response received in call to '{$what}Request.php': " . json_encode($response), static::ERROR_CODE_INVALID_RESPONSE);
+        }
+        if (empty($response->{$what}->OperationResult)) {
+            throw new Exception("Missing '$what->OperationResult' in response received in call to '{$what}Request.php': " . json_encode($response), static::ERROR_CODE_INVALID_RESPONSE);
+        }
+        if (array_search($response->{$what}->OperationResult, $allowed_op_result) === FALSE) {
+            throw new Exception("Invalid 'OperationResult' received in call to '{$what}Request.php': " . $response->{$what}->OperationResult, static::ERROR_CODE_INVALID_RESPONSE);
+        }
+    }
 
     /**
-     * Load the VIN and DCMID values, either from disk, if they were saved there by a previous call, or from the remote API, if not.
+     * Load the VIN, DCMID and CustomSessionID values, either from disk, if they were saved there by a previous call, or from the remote API, if not.
      *
      * @throws Exception
      */
-    private function prepare() {
-        if (empty($this->config->vin) || empty($this->config->dcmID)) {
+    private function prepare($skip_local_file = FALSE) {
+        if (empty($this->config->vin) || empty($this->config->dcmID) || empty($this->config->customSessionID)) {
             $uid = md5($this->config->username);
             $local_storage_file = "/tmp/.nissan-connect-storage-$uid.json";
-            if (file_exists($local_storage_file)) {
+            if (file_exists($local_storage_file) && !$skip_local_file) {
                 $json = @json_decode(file_get_contents($local_storage_file));
                 $this->config->vin = @$json->vin;
                 $this->config->dcmID = @$json->dcmid;
+                $this->config->customSessionID = @$json->sessionid;
             }
-            if (empty($this->config->vin) || empty($this->config->dcmID)) {
+            if (empty($this->config->vin) || empty($this->config->dcmID) || empty($this->config->customSessionID)) {
                 $this->login();
-                file_put_contents($local_storage_file, json_encode(array('vin' => $this->config->vin, 'dcmid' => $this->config->dcmID)));
-                $this->debug("Saving DCMID and VIN into local file $local_storage_file");
+                file_put_contents($local_storage_file, json_encode(array('vin' => $this->config->vin, 'dcmid' => $this->config->dcmID, 'sessionid' => $this->config->customSessionID)));
+                $this->debug("Saving DCMID, VIN and CustomSessionID into local file $local_storage_file");
             } else {
-                $this->debug("Using DCMID and VIN found in local file $local_storage_file");
+                $this->debug("Using DCMID, VIN and CustomSessionID found in local file $local_storage_file");
             }
         }
     }
@@ -225,17 +252,27 @@ class NissanConnect {
      * @throws Exception
      */
     private function login() {
-        $params = array('Password' => $this->config->password);
+        $result = $this->sendRequest('InitialApp.php');
+        if (empty($result->baseprm)) {
+            throw new Exception("Failed to get 'baseprm' using InitialApp.php. Response: " . json_encode($result), static::ERROR_CODE_LOGIN_FAILED);
+        }
+        $this->config->basePRM = $result->baseprm;
+
+        $encrypted_encoded_password = static::encryptPassword($this->config->password, $this->config->basePRM);
+        $params = array('UserId' => $this->config->username, 'Password' => $encrypted_encoded_password);
         $result = $this->sendRequest('UserLoginRequest.php', $params);
 
         if (isset($result->CustomerInfo->VehicleInfo->DCMID)) {
             $this->config->dcmID = $result->CustomerInfo->VehicleInfo->DCMID;
         }
+        if (isset($result->VehicleInfoList->vehicleInfo[0]->custom_sessionid)) {
+            $this->config->customSessionID = $result->VehicleInfoList->vehicleInfo[0]->custom_sessionid;
+        }
         if (isset($result->CustomerInfo->VehicleInfo->VIN)) {
             $this->config->vin = $result->CustomerInfo->VehicleInfo->VIN;
         }
-        if (empty($this->config->vin) || empty($this->config->dcmID)) {
-            throw new Exception("Login failed, or failed to find car VIN and DCMID in response of login request: " . json_encode($result), static::ERROR_CODE_LOGIN_FAILED);
+        if (empty($this->config->vin) || empty($this->config->dcmID) || empty($this->config->customSessionID)) {
+            throw new Exception("Login failed, or failed to find car VIN, DCMID or custom_sessionid in response of login request: " . json_encode($result), static::ERROR_CODE_LOGIN_FAILED);
         }
     }
 
@@ -248,23 +285,21 @@ class NissanConnect {
      * @throws Exception
      */
     private function sendRequest($path, $params = array()) {
-        $params['UserId'] = $this->config->username;
+        $params['custom_sessionid'] = $this->config->customSessionID;
+        $params['initial_app_strings'] = $this->config->initialAppStrings;
         $params['RegionCode'] = $this->config->country;
         $params['lg'] = 'en-US';
         $params['DCMID'] = $this->config->dcmID;
         $params['VIN'] = $this->config->vin;
         $params['tz'] = $this->config->tz;
 
-        $encoded_params = array();
-        foreach ($params as $k => $v) {
-            $encoded_params[] = "$k=" . urlencode($v);
-        }
+        $url = $this->baseURL . $path;
 
-        $url = $this->baseURL . $path . '?' . implode('&', $encoded_params);
-
-        $this->debug("Request: $url");
+        $this->debug("Request: POST $url " . json_encode($params));
 
         $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, TRUE);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $params);
         curl_setopt($ch, CURLOPT_HEADER, FALSE);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE);
 
@@ -281,6 +316,13 @@ class NissanConnect {
                 $this->debug("Found resultKey in response: $this->resultKey");
             }
             if ($json->status !== 200) {
+                if ($json->status == 404 && $this->shouldRetry) {
+                    $this->debug("Request for '$path' failed. Response received: " . json_encode($json) . " Will retry.");
+                    $this->shouldRetry = FALSE; // Don't loop infinitely!
+                    $this->config->customSessionID = NULL;
+                    $this->prepare(TRUE);
+                    return $this->sendRequest($path, $params);
+                }
                 throw new Exception("Request for '$path' failed. Response received: " . json_encode($json), $json->status);
             }
             $this->debug("Response: " . json_encode($json));
@@ -327,5 +369,21 @@ class NissanConnect {
             $date = date('Y-m-d H:i:s');
             error_log("[$date] [NissanConnect] $log");
         }
+    }
+
+    private static function encryptPassword($password, $key) {
+        $size = @call_user_func('mcrypt_get_block_size', MCRYPT_BLOWFISH);
+        if (empty($size)) {
+            $size = @call_user_func('mcrypt_get_block_size', MCRYPT_BLOWFISH, MCRYPT_MODE_ECB);
+        }
+        $password = static::pkcs5_pad($password, $size);
+        $iv = mcrypt_create_iv(mcrypt_get_iv_size(MCRYPT_BLOWFISH, MCRYPT_MODE_ECB), MCRYPT_RAND);
+        $encrypted_password = mcrypt_encrypt(MCRYPT_BLOWFISH, $key, $password, MCRYPT_MODE_ECB, $iv);
+        return base64_encode($encrypted_password);
+    }
+
+    private static function pkcs5_pad($text, $blocksize) {
+        $pad = $blocksize - (strlen($text) % $blocksize);
+        return $text . str_repeat(chr($pad), $pad);
     }
 }

@@ -3,9 +3,9 @@
 <?php $title = 'LEAF Status'; include("header.inc.php") ?>
 
 <?php
-$use_cache = isset($_GET['cached']);
+$option = isset($_GET['cached']) ? NissanConnect::STATUS_QUERY_OPTION_CACHED : NissanConnect::STATUS_QUERY_OPTION_NONE;
 try {
-    $result = $nissanConnect->getStatus($use_cache);
+    $result = $nissanConnect->getStatus($option);
 } catch (Exception $ex) {
     die($ex->getMessage());
 }
