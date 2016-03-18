@@ -5,6 +5,7 @@ Requirements
 ------------
 * A webserver with PHP
 * The cURL PHP extension enabled
+* The mcrypt PHP extension enabled
 
 Installation Instructions
 -------------------------
