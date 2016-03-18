@@ -1,6 +1,8 @@
 LEAF Carwings One-Click Shortcuts
 =================================
 
+![LEAF One-Click mini site](http://cl.ly/242W3k361n2U/leaf-one-click.gif "LEAF One-Click mini site")
+
 Requirements
 ------------
 * A webserver with PHP
