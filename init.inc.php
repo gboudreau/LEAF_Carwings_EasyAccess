@@ -16,5 +16,6 @@ if (empty($car->tz)) {
     $car->tz = 'Canada/Eastern';
 }
 
-$nissanConnect = new NissanConnect($car->username, $car->password, $car->tz, $car->country);
-$nissanConnect->debug = TRUE;
+$encryption_option = $encrypt_using_webservice ? NissanConnect::ENCRYPTION_OPTION_WEBSERVICE : NissanConnect::ENCRYPTION_OPTION_MCRYPT;
+$nissanConnect = new NissanConnect($car->username, $car->password, $car->tz, $car->country, $encryption_option);
+$nissanConnect->debug = FALSE;

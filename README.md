@@ -7,22 +7,22 @@ Requirements
 ------------
 * A webserver with PHP
 * The cURL PHP extension enabled
-* The mcrypt PHP extension enabled
+* The mcrypt PHP extension enabled (optional)
 
 Installation Instructions
 -------------------------
-Copy everything (including the hidden .htaccess file!) into a directory on your web server.
+Copy everything into a directory on your web server.
 Let's say it's accessible from http://www.your_domain.com/leaf/
-
-Edit your httpd.conf; make sure the directory on your web server has AllowOverride FileInfo or AllowOverride All, to allow the .htaccess file to do it's job.
 
 Edit config.inc.php:
 
-1. Generate a new GUID (using [this tool]() for example), and replace the \_your\_guid\_here\_ string with this new GUID.
+1. Generate a new GUID (using [this tool](http://www.somacon.com/p113.php) for example), and replace the \_your\_guid\_here\_ string with this new GUID.
 
 2. Change the country as necessary.
 
-3. Enter your Carwings username and password.
+3. Enter your Nissan Connect username (email address) and password.
+
+4. If you can't enable the mcrypt PHP extension, you will need to change `$encrypt_using_webservice` to `TRUE`. **WARNING!** This will use a remote web service to encrypt your password.
 
 You're done.
 
