@@ -11,6 +11,6 @@ $cars = array(
 	),
 );
 
-// Change to TRUE if you can't install the mcrypt PHP extension.
+// Change to TRUE if you can't use openssl_encrypt().
 // This will use a remote web service to encrypt your password.
 $encrypt_using_webservice = FALSE;

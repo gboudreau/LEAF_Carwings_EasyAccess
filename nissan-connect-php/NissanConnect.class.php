@@ -1,6 +1,6 @@
 <?php
 /*
-Copyright 2016 Guillaume Boudreau
+Copyright 2016-2017 Guillaume Boudreau
 Source: https://github.com/gboudreau/nissan-connect-php
 
 This class is free software: you can redistribute it and/or modify
@@ -22,6 +22,7 @@ class NissanConnect {
     /* Those are the possible values for the constructor 'country' parameter. */
     const COUNTRY_CANADA = 'NCI';
     const COUNTRY_US = 'NNA';
+    const COUNTRY_EU = 'NE';
 
     /* Those error code will be used in Exception that can be thrown when errors occur. */
     const ERROR_CODE_MISSING_RESULTKEY = 400;
@@ -29,26 +30,26 @@ class NissanConnect {
     const ERROR_CODE_INVALID_RESPONSE = 405;
     const ERROR_CODE_NOT_JSON = 406;
     const ERROR_CODE_TIMEOUT = 408;
-    
+
     const STATUS_QUERY_OPTION_NONE   = 0;
     const STATUS_QUERY_OPTION_ASYNC  = 1;
     const STATUS_QUERY_OPTION_CACHED = 2;
 
-    const ENCRYPTION_OPTION_MCRYPT     = 0;
+    const ENCRYPTION_OPTION_OPENSSL    = 0;
     const ENCRYPTION_OPTION_WEBSERVICE = 1;
 
-    /** @var int How long should we wait, before throwing an exception, when waiting for the car to execute a command. @see $waitForResult parameter in the various function calls. */
+    /* @var int How long should we wait, before throwing an exception, when waiting for the car to execute a command. @see $waitForResult parameter in the various function calls. */
     public $maxWaitTime = 290;
 
-    /** @var boolean Enable to echo debugging information into the PHP error log. */
+    /* @var boolean Enable to echo debugging information into the PHP error log. */
     public $debug = FALSE;
 
-    private $baseURL = 'https://gdcportalgw.its-mo.com/gworchest_0307C/gdc/';
+    private $baseURL = 'https://gdcportalgw.its-mo.com/gworchest_0323C/gdc/';
 
     private $resultKey = NULL;
     private $config = NULL;
 
-    /** @var boolean Should we retry to login, if the API return us a 404 error. */
+    /* @var boolean Should we retry to login, if the API return us a 404 error. */
     private $shouldRetry = TRUE;
 
     /**
@@ -58,7 +59,7 @@ class NissanConnect {
      * @param string $password         The password to use to login on the remote API.
      * @param string $tz               The timezone to use for dates. Default value: America/New_York
      * @param string $country          One of the COUNTRY_* constants available in this class. Default value: COUNTRY_US
-     * @param int    $encryptionOption Use ENCRYPTION_OPTION_MCRYPT (the default) if you can; otherwise, use ENCRYPTION_OPTION_WEBSERVICE, which will use a remote web-service to encrypt your password.
+     * @param int    $encryptionOption Use ENCRYPTION_OPTION_OPENSSL (the default) if you can; otherwise, use ENCRYPTION_OPTION_WEBSERVICE, which will use a remote web-service to encrypt your password.
      */
     public function __construct($username, $password, $tz = 'America/New_York', $country = NissanConnect::COUNTRY_US, $encryptionOption = 0) {
         $this->config = new stdClass();
@@ -68,6 +69,7 @@ class NissanConnect {
         $this->config->country = strtoupper($country);
         $this->config->vin = '';
         $this->config->dcmID = '';
+        $this->config->UserVehicleBoundTime = '';
         $this->config->initialAppStrings = 'geORNtsZe5I4lRGjG9GZiA'; // Hard-coded in mobile apps?
         $this->config->basePRM = 'uyI5Dj9g8VCOFDnBRUbr3g'; // Will be overwritten with the response from the InitialApp.php call
         $this->config->customSessionID = ''; // Empty until login completes
@@ -78,10 +80,11 @@ class NissanConnect {
      * Start the Climate Control.
      *
      * @param bool $waitForResult Should we wait until the command result is known, before returning? Enabling this will wait until the car executed the command, and returned the response, which can sometimes take a few minutes.
+     *
      * @return stdClass
      * @throws Exception
      */
-    public function startClimateControl($waitForResult=FALSE) {
+    public function startClimateControl($waitForResult = FALSE) {
         $this->prepare();
         $result = $this->sendRequest('ACRemoteRequest.php');
         if ($waitForResult) {
@@ -95,10 +98,11 @@ class NissanConnect {
      * Stop the Climate Control.
      *
      * @param bool $waitForResult Should we wait until the command result is known, before returning? Enabling this will wait until the car executed the command, and returned the response, which can sometimes take a few minutes.
+     *
      * @return stdClass
      * @throws Exception
      */
-    public function stopClimateControl($waitForResult=FALSE) {
+    public function stopClimateControl($waitForResult = FALSE) {
         $this->prepare();
         $result = $this->sendRequest('ACRemoteOffRequest.php');
         if ($waitForResult) {
@@ -143,7 +147,7 @@ class NissanConnect {
         $response = $this->sendRequest('BatteryStatusRecordsRequest.php');
         $this->_checkStatusResult($response, 'BatteryStatusRecords');
 
-        $response2 = $this->sendRequest('RemoteACRecordsRequest.php');
+        $response2 = $this->sendRequest('RemoteACRecordsRequest.php', array('TimeFrom' => gmdate('Y-m-d\TH:i:s', strtotime($this->config->UserVehicleBoundTime))));
         $this->_checkStatusResult($response2, 'RemoteACRecords');
 
         $result = new stdClass();
@@ -170,6 +174,12 @@ class NissanConnect {
         } else {
             $result->BatteryRemainingAmountkWH = NULL;
         }
+        // SOC = The percentage state of charge (don't work under 5%) -> API Answer is "SOC":{"Display":"---"}}
+        if (!empty($response->BatteryStatusRecords->BatteryStatus->SOC->Value)) {
+            $result->SOC =  $response->BatteryStatusRecords->BatteryStatus->SOC->Value;
+        } else {
+            $result->SOC = NULL;
+        }
 
         foreach (array('TimeRequiredToFull', 'TimeRequiredToFull200', 'TimeRequiredToFull200_6kW') as $var_name) {
             if (empty($response->BatteryStatusRecords->{$var_name}->HourRequiredToFull) && empty($response->BatteryStatusRecords->{$var_name}->MinutesRequiredToFull)) {
@@ -189,7 +199,12 @@ class NissanConnect {
             }
         }
 
-        if ($this->config->country == 'US') {
+        // Can be Null, under 15km
+        if (empty($response->BatteryStatusRecords->CruisingRangeAcOn)) {
+            $result->CruisingRangeAcOn = NULL;
+            $result->CruisingRangeUnit = NULL;
+            $result->CruisingRangeUnit = '---';
+        } elseif ($this->config->country == 'US') {
             $result->CruisingRangeAcOn = $response->BatteryStatusRecords->CruisingRangeAcOn * 0.000621371192;
             $result->CruisingRangeAcOff = $response->BatteryStatusRecords->CruisingRangeAcOff * 0.000621371192;
             $result->CruisingRangeUnit = 'miles';
@@ -211,7 +226,7 @@ class NissanConnect {
 
         return $result;
     }
-    
+
     private function _checkStatusResult($response, $what) {
         $allowed_op_result = array('START', 'START_BATTERY', 'FINISH');
         if (empty($response->{$what})) {
@@ -226,12 +241,15 @@ class NissanConnect {
     }
 
     /**
-     * Load the VIN, DCMID and CustomSessionID values, either from disk, if they were saved there by a previous call, or from the remote API, if not.
+     * Load the VIN, DCMID, UserVehicleBoundTime and CustomSessionID values, either from disk, if they were saved there by a previous call, or from the remote API, if not.
      *
+     * @param bool $skip_local_file Should we skip loading the cached information from the local file, and force a login to obtain them.
+     *
+     * @return void
      * @throws Exception
      */
     private function prepare($skip_local_file = FALSE) {
-        if (empty($this->config->vin) || empty($this->config->dcmID) || empty($this->config->customSessionID)) {
+        if (empty($this->config->vin) || empty($this->config->dcmID) || empty($this->config->customSessionID) || empty($this->config->UserVehicleBoundTime)) {
             $uid = md5($this->config->username);
             $local_storage_file = "/tmp/.nissan-connect-storage-$uid.json";
             if (file_exists($local_storage_file) && !$skip_local_file) {
@@ -239,13 +257,14 @@ class NissanConnect {
                 $this->config->vin = @$json->vin;
                 $this->config->dcmID = @$json->dcmid;
                 $this->config->customSessionID = @$json->sessionid;
+                $this->config->UserVehicleBoundTime = @$json->UserVehicleBoundTime;
             }
-            if (empty($this->config->vin) || empty($this->config->dcmID) || empty($this->config->customSessionID)) {
+            if (empty($this->config->vin) || empty($this->config->dcmID) || empty($this->config->customSessionID) || empty($this->config->UserVehicleBoundTime)) {
                 $this->login();
-                file_put_contents($local_storage_file, json_encode(array('vin' => $this->config->vin, 'dcmid' => $this->config->dcmID, 'sessionid' => $this->config->customSessionID)));
-                $this->debug("Saving DCMID, VIN and CustomSessionID into local file $local_storage_file");
+                file_put_contents($local_storage_file, json_encode(array('vin' => $this->config->vin, 'dcmid' => $this->config->dcmID, 'sessionid' => $this->config->customSessionID, 'UserVehicleBoundTime' => $this->config->UserVehicleBoundTime)));
+                $this->debug("Saving DCMID, VIN, UserVehicleBoundTime and CustomSessionID into local file $local_storage_file");
             } else {
-                $this->debug("Using DCMID, VIN and CustomSessionID found in local file $local_storage_file");
+                $this->debug("Using DCMID, VIN, UserVehicleBoundTime and CustomSessionID found in local file $local_storage_file");
             }
         }
     }
@@ -253,6 +272,7 @@ class NissanConnect {
     /**
      * Login using the user's email address and password, to get the DCMID value needed to make subsequent API calls.
      *
+     * @return void
      * @throws Exception
      */
     private function login() {
@@ -269,22 +289,29 @@ class NissanConnect {
         if (isset($result->CustomerInfo->VehicleInfo->DCMID)) {
             $this->config->dcmID = $result->CustomerInfo->VehicleInfo->DCMID;
         }
+        if (isset($result->CustomerInfo->VehicleInfo->UserVehicleBoundTime)) {
+            $this->config->UserVehicleBoundTime = $result->CustomerInfo->VehicleInfo->UserVehicleBoundTime;
+        }
         if (isset($result->VehicleInfoList->vehicleInfo[0]->custom_sessionid)) {
             $this->config->customSessionID = $result->VehicleInfoList->vehicleInfo[0]->custom_sessionid;
+        }
+        if (empty($this->config->customSessionID) && isset($result->vehicleInfo[0]->custom_sessionid)) {
+            $this->config->customSessionID = $result->vehicleInfo[0]->custom_sessionid;
         }
         if (isset($result->CustomerInfo->VehicleInfo->VIN)) {
             $this->config->vin = $result->CustomerInfo->VehicleInfo->VIN;
         }
-        if (empty($this->config->vin) || empty($this->config->dcmID) || empty($this->config->customSessionID)) {
-            throw new Exception("Login failed, or failed to find car VIN, DCMID or custom_sessionid in response of login request: " . json_encode($result), static::ERROR_CODE_LOGIN_FAILED);
+        if (empty($this->config->vin) || empty($this->config->dcmID) || empty($this->config->customSessionID) || empty($this->config->UserVehicleBoundTime)) {
+            throw new Exception("Login failed, or failed to find car VIN, DCMID, UserVehicleBoundTime or custom_sessionid in response of login request: " . json_encode($result), static::ERROR_CODE_LOGIN_FAILED);
         }
     }
 
     /**
      * Send an HTTP GET request to the specified script, and return the JSON-decoded result.
      *
-     * @param String $path Script to send the request to.
-     * @param array $params Query parameters to send with the request.
+     * @param string $path   Script to send the request to.
+     * @param array  $params Query parameters to send with the request.
+     *
      * @return stdClass JSON-decoded response from API.
      * @throws Exception
      */
@@ -336,11 +363,12 @@ class NissanConnect {
         throw new Exception("Non-JSON response received for request to '$path'. Response received: " . json_encode($result), static::ERROR_CODE_NOT_JSON);
     }
 
-    /** @noinspection PhpInconsistentReturnPointsInspection
-     *
+    /* @noinspection PhpInconsistentReturnPointsInspection */
+    /**
      * Wait until the previously-execute command completes. This will wait until the car executed the command, and returned the response, which can sometimes take a few minutes.
      *
      * @param string $path Script to use to query the server to know if the operation completed, or not yet.
+     *
      * @return stdClass
      * @throws Exception
      */
@@ -366,7 +394,9 @@ class NissanConnect {
     /**
      * Log debugging information to the PHP error log.
      *
-     * @param String $log
+     * @param String $log Text to log.
+     *
+     * @return void
      */
     private function debug($log) {
         if ($this->debug) {
@@ -379,18 +409,11 @@ class NissanConnect {
         if ($this->config->encryptionOption == static::ENCRYPTION_OPTION_WEBSERVICE) {
             return trim(file_get_contents("https://dataproxy.pommepause.com/nissan-connect-encrypt.php?key=" . urlencode($key) . "&password=" . urlencode($password)));
         }
-        $size = @call_user_func('mcrypt_get_block_size', MCRYPT_BLOWFISH);
-        if (empty($size)) {
-            $size = @call_user_func('mcrypt_get_block_size', MCRYPT_BLOWFISH, MCRYPT_MODE_ECB);
+        if (!function_exists('openssl_encrypt')) {
+            throw new Exception("OpenSSL support in PHP is not available. Either use ENCRYPTION_OPTION_WEBSERVICE as the encryption option, to use a remote web-service to encrypt passwords, or compile PHP using --with-openssl.");
         }
-        $password = static::pkcs5_pad($password, $size);
-        $iv = mcrypt_create_iv(mcrypt_get_iv_size(MCRYPT_BLOWFISH, MCRYPT_MODE_ECB), MCRYPT_RAND);
-        $encrypted_password = mcrypt_encrypt(MCRYPT_BLOWFISH, $key, $password, MCRYPT_MODE_ECB, $iv);
+        $method = 'bf-ecb';
+        $encrypted_password = openssl_encrypt($password, $method, $key, TRUE);
         return base64_encode($encrypted_password);
-    }
-
-    private static function pkcs5_pad($text, $blocksize) {
-        $pad = $blocksize - (strlen($text) % $blocksize);
-        return $text . str_repeat(chr($pad), $pad);
     }
 }

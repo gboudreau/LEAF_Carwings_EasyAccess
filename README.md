@@ -7,7 +7,6 @@ Requirements
 ------------
 * A webserver with PHP
 * The cURL PHP extension enabled
-* The mcrypt PHP extension enabled (optional)
 
 Installation Instructions
 -------------------------
@@ -22,7 +21,7 @@ Edit config.inc.php:
 
 3. Enter your Nissan Connect username (email address) and password.
 
-4. If you can't enable the mcrypt PHP extension, you will need to change `$encrypt_using_webservice` to `TRUE`. **WARNING!** This will use a remote web service to encrypt your password.
+4. If you can't use the openssl_encrypt() function (very unlikely), you will need to change `$encrypt_using_webservice` to `TRUE`. **WARNING!** This will use a remote web service to encrypt your password.
 
 You're done.
 
