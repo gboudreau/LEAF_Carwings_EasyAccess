@@ -26,3 +26,9 @@ Edit config.inc.php:
 You're done.
 
 You can now access the one-click shortcuts using the index page at http://www.your_domain.com/leaf/?id=_your_guid_here_
+
+Acknowledgements
+----------------
+Developed mainly using a free open-source license of  
+![PHPStorm](https://d3uepj124s5rcx.cloudfront.net/items/0V0z2p0e0K1D0F3t2r1P/logo_PhpStorm.png)  
+kindly provided by [JetBrains](http://www.jetbrains.com/). Thanks guys!
