@@ -11,7 +11,7 @@ try {
 }
 ?>
 
-Battery: <?php echo "$result->BatteryRemainingAmount/12 (" . round($result->BatteryRemainingAmount*100.0/12) . "%)" ?><br/>
+Battery: <?php echo "$result->BatteryRemainingAmount/$result->BatteryCapacity (" . round($result->BatteryRemainingAmount*100.0/$result->BatteryCapacity) . "%)" ?><br/>
 <hr/>
 
 Plugged in: <?php echo ($result->PluggedIn ? '<span class="on">YES</span>' : '<span class="off">NO</span>') ?><br/>
