@@ -19,7 +19,7 @@ Edit config.inc.php:
 
 2. Change the country as necessary.
 
-3. Enter your Nissan Connect username (email address) and password.
+3. Enter your Nissan Connect username and password.
 
 4. If you can't use the openssl_encrypt() function (very unlikely), you will need to change `$encrypt_using_webservice` to `TRUE`. **WARNING!** This will use a remote web service to encrypt your password.
 
